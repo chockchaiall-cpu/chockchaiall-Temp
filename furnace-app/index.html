@@ -34,8 +34,8 @@ h1,h2,h3,p{margin:0}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 header{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:14px 24px;background:var(--bar);border-bottom:1px solid var(--line)}
-.brand{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:4px}
-.brand h1{font-family:var(--head);font-size:30px;line-height:1.2;font-weight:700}
+.brand{flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:4px;container-type:inline-size}
+.brand h1{font-family:var(--head);font-size:clamp(16px,3.2cqw,30px);line-height:1.25;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand .co{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .brand .co span:first-child{font-size:19px;font-weight:600;color:var(--blue2)}
 .tag{padding:2px 10px;border-radius:6px;border:1px solid var(--line2);background:#fff;font-family:var(--head);font-size:13px;font-weight:600;letter-spacing:.08em;color:var(--text2)}
@@ -143,7 +143,7 @@ code{font-family:var(--mono);color:var(--blue2);font-size:13px}
 .netbar.show{display:block}
 @media (display-mode: standalone){header{padding-top:max(14px,env(safe-area-inset-top))}}
 @media (max-width:1100px){.rowA,.rowB,.datagrid{grid-template-columns:1fr}}
-@media (max-width:760px){.shell{flex-direction:column}aside{width:auto;border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr}aside .cap{grid-column:1/-1}main{padding:16px}.brand h1{font-size:22px}.brand .co span:first-child{font-size:16px}}
+@media (max-width:760px){.shell{flex-direction:column}aside{width:auto;border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr}aside .cap{grid-column:1/-1}main{padding:16px}.brand h1{font-size:20px;white-space:normal}.brand .co span:first-child{font-size:16px}}
 </style>
 </head>
 <body>
