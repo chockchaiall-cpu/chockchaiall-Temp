@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Furnace HMI · ระบบแสดงผลการควบคุมอุณหภูมิเตาหลอมอัตโนมัติ</title>
+<meta name="theme-color" content="#F7F9FC">
+<meta name="description" content="แสดงผลการควบคุมอุณหภูมิเตาหลอมจาก Google Sheets">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Furnace HMI">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFFFFF; --bar:#F7F9FC; --card:#FFFFFF; --inset:#F4F6FA; --soft:#EEF2F8;
+  --line:#D9E0EA; --line2:#C3CDDB; --grid:#E6EBF2;
+  --text:#0F1B2D; --muted:#5B6B82; --text2:#3A4A62;
+  --pv:#B45309; --sv:#15803D; --blue:#1D6FD1; --blue2:#1D5FB0;
+  --ok:#15803D; --okbg:#E7F6EC; --okline:#86CFA3;
+  --warn:#9A4A08; --warnbg:#FDF1E3; --warnline:#F0C48A;
+  --bad:#C0362C; --badbg:#FDECEA; --badline:#F1A9A2;
+  --head:'Chakra Petch','IBM Plex Sans Thai',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;display:flex;flex-direction:column;min-height:100vh}
+button{font-family:inherit;cursor:pointer}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+header{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:14px 24px;background:var(--bar);border-bottom:1px solid var(--line)}
+.brand{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:4px}
+.brand h1{font-family:var(--head);font-size:30px;line-height:1.2;font-weight:700}
+.brand .co{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand .co span:first-child{font-size:19px;font-weight:600;color:var(--blue2)}
+.tag{padding:2px 10px;border-radius:6px;border:1px solid var(--line2);background:#fff;font-family:var(--head);font-size:13px;font-weight:600;letter-spacing:.08em;color:var(--text2)}
+.src{display:flex;align-items:center;gap:10px;padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;text-align:left;color:var(--text);min-height:44px}
+.src:hover{border-color:var(--blue)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.dot.warn{background:#D97706}.dot.bad{background:var(--bad)}
+.src small{display:block;font-size:12px;color:var(--muted)}
+.src b{font-size:14px;font-weight:500}
+.btn{height:44px;padding:0 16px;border-radius:8px;border:1px solid var(--line2);background:var(--soft);color:var(--text);font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{border-color:var(--blue)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.clock{display:flex;flex-direction:column;align-items:flex-end}
+.clock span:first-child{font-size:13px;color:var(--muted)}
+.clock span:last-child{font-size:20px;font-weight:600}
+.estop{padding:10px 14px;border-radius:8px;font-family:var(--head);font-weight:600;font-size:14px;letter-spacing:.04em;background:var(--okbg);border:1px solid var(--okline);color:var(--ok)}
+.estop.on{background:var(--badbg);border-color:var(--badline);color:var(--bad)}
+
+.shell{flex:1;display:flex;min-height:0}
+aside{width:232px;flex-shrink:0;padding:20px 16px;border-right:1px solid var(--line);background:var(--bar);display:flex;flex-direction:column;gap:10px}
+.cap{font-family:var(--head);font-size:13px;font-weight:600;letter-spacing:.08em;color:var(--muted)}
+.lamp{height:52px;padding:0 14px;display:flex;align-items:center;gap:12px;border-radius:8px;background:#fff;border:1px solid var(--line)}
+.lamp i{width:14px;height:14px;border-radius:50%;background:#E1E6EE;border:2px solid #B7C1D1;flex-shrink:0}
+.lamp span{flex:1;font-size:15px;font-weight:500}
+.lamp b{font-family:var(--mono);font-size:13px;color:#6B7A90}
+.lamp.on i{background:var(--ok);border-color:var(--okline)}
+.lamp.on b{color:var(--ok)}
+
+main{flex:1;min-width:0;padding:24px}
+.page{display:none;flex-direction:column;gap:20px}
+.page.show{display:flex}
+.row{display:grid;gap:20px}
+.rowA{grid-template-columns:2fr 1fr}
+.rowB{grid-template-columns:3fr 1fr}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2,.card h3{font-family:var(--head);font-size:16px;font-weight:600;letter-spacing:.06em;color:var(--muted)}
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.chip{padding:5px 12px;border-radius:999px;font-size:13px;font-weight:500;background:var(--warnbg);border:1px solid var(--warnline);color:var(--warn)}
+.chip.ok{background:var(--okbg);border-color:var(--okline);color:var(--ok)}
+.chip.bad{background:var(--badbg);border-color:var(--badline);color:var(--bad)}
+.temp{flex-direction:row;gap:24px;flex-wrap:wrap}
+.temp .big{flex:1 1 320px;display:flex;flex-direction:column;gap:12px}
+.pv{display:flex;align-items:baseline;gap:10px;color:var(--pv)}
+.pv b{font-family:var(--mono);font-size:clamp(64px,8vw,104px);line-height:1;font-weight:600}
+.pv span{font-family:var(--mono);font-size:28px}
+.sub{font-size:14px;color:var(--muted)}
+.bar{height:12px;border-radius:6px;background:var(--inset);border:1px solid var(--line);overflow:hidden}
+.bar div{height:100%;width:0;background:var(--pv);transition:width .4s}
+.bar.blue div{background:var(--blue)}
+.barlab{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.side{flex:0 1 250px;display:flex;flex-direction:column;gap:10px;min-width:200px}
+.read{flex:1;padding:12px 16px;border-radius:8px;background:var(--inset);border:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:2px}
+.read small{font-size:13px;color:var(--muted)}
+.read b{font-family:var(--mono);font-size:32px;font-weight:600}
+.read b em{font-style:normal;font-size:16px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mt{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--text2);align-items:center}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:18px;height:3px;background:var(--pv)}
+.sw.sv{height:0;background:none;border-top:2px dashed var(--sv)}
+.sw.f{height:2px;background:var(--blue)}
+.chart{display:flex;gap:8px}
+.yax{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-family:var(--mono);font-size:12px;color:var(--muted);min-width:40px}
+.yax.r{align-items:flex-start;color:var(--blue2);min-width:30px}
+.plot{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.plot svg{display:block;width:100%;background:var(--inset);border-radius:6px}
+.xax{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.ev{display:flex;gap:12px;padding:10px 12px;border-radius:8px;background:var(--inset);border:1px solid var(--line)}
+.ev time{font-family:var(--mono);font-size:13px;color:var(--muted);padding-top:2px}
+.ev b{display:block;font-size:13px}
+.ev span{font-size:14px}
+.empty{font-size:14px;color:var(--muted);padding:8px 0}
+.lv-info{color:var(--blue2)}.lv-warn{color:var(--warn)}.lv-bad{color:var(--bad)}.lv-ok{color:var(--ok)}
+.pagehead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.pagehead div:first-child{flex:1 1 300px}
+.pagehead h2{font-family:var(--head);font-size:24px;font-weight:600}
+.pagehead p{margin-top:4px;font-size:14px;color:var(--muted)}
+.conds{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.cond{padding:16px 18px;border-radius:10px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;gap:14px}
+.cond i{width:14px;height:14px;border-radius:50%;background:var(--ok);border:2px solid var(--okline);flex-shrink:0}
+.cond div{flex:1}.cond div b{display:block;font-size:15px;font-weight:500}.cond div small{font-size:13px;color:var(--muted)}
+.cond>b{font-size:13px;color:var(--ok)}
+.cond.act{border-color:var(--badline);background:var(--badbg)}
+.cond.act i{background:var(--bad);border-color:var(--badline)}.cond.act>b{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:12px 16px;background:var(--soft);font-size:13px;color:var(--muted);font-weight:600}
+td{padding:11px 16px;border-top:1px solid var(--line);vertical-align:top}
+.tablecard{padding:0;overflow:auto;gap:0}
+.tablecard .cardhead{padding:14px 16px}
+.seg{display:flex;gap:6px;padding:4px;border-radius:10px;background:#fff;border:1px solid var(--line)}
+.seg button{height:40px;padding:0 16px;border-radius:7px;border:0;background:transparent;color:var(--text2);font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--blue);color:#fff;font-weight:600}
+.datagrid{display:grid;grid-template-columns:minmax(300px,440px) 1fr;gap:20px}
+label{font-size:14px;font-weight:500;display:block;margin-bottom:6px}
+input,select{width:100%;height:44px;padding:0 12px;border-radius:8px;border:1px solid var(--line2);background:var(--inset);color:var(--text);font-size:14px;font-family:inherit}
+input{font-family:var(--mono)}
+.msg{padding:12px 14px;border-radius:8px;font-size:14px;background:var(--warnbg);border:1px solid var(--warnline);color:var(--warn)}
+.msg.ok{background:var(--okbg);border-color:var(--okline);color:#146C36}
+.msg.bad{background:var(--badbg);border-color:var(--badline);color:var(--bad)}
+ol{margin:0;padding-left:20px;font-size:14px;line-height:1.7;color:#26364D}
+code{font-family:var(--mono);color:var(--blue2);font-size:13px}
+.install{display:none}.install.show{display:inline-flex}
+.netbar{display:none;padding:8px 24px;background:var(--warnbg);border-bottom:1px solid var(--warnline);color:var(--warn);font-size:14px}
+.netbar.show{display:block}
+@media (display-mode: standalone){header{padding-top:max(14px,env(safe-area-inset-top))}}
+@media (max-width:1100px){.rowA,.rowB,.datagrid{grid-template-columns:1fr}}
+@media (max-width:760px){.shell{flex-direction:column}aside{width:auto;border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr}aside .cap{grid-column:1/-1}main{padding:16px}.brand h1{font-size:22px}.brand .co span:first-child{font-size:16px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>ระบบแสดงผลการควบคุมอุณหภูมิเตาหลอมอัตโนมัติ</h1>
+    <div class="co"><span>บริษัท โชคชัย ออลเมทอล เซอร์วิส จำกัด</span><span class="tag">MAIN MONITOR</span></div>
+  </div>
+  <button class="src" id="srcBtn" title="ตั้งค่าแหล่งข้อมูล Google Sheets">
+    <span class="dot warn" id="srcDot"></span>
+    <span><small id="srcKind">Google Sheets</small><b id="srcText">กำลังโหลด…</b></span>
+  </button>
+  <button class="btn" id="refreshBtn">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+    ดึงข้อมูลใหม่
+  </button>
+  <button class="btn primary install" id="installBtn" title="ติดตั้งเป็นแอปบนเครื่องนี้">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+    ติดตั้งแอป
+  </button>
+  <div class="clock mono"><span id="clkDate">—</span><span id="clkTime">—</span></div>
+  <div class="estop" id="estop">EMERGENCY OFF</div>
+</header>
+<div class="netbar" id="netbar">ไม่มีอินเทอร์เน็ต · กำลังแสดงข้อมูลล่าสุดที่บันทึกไว้ในเครื่อง</div>
+
+<div class="shell">
+  <aside>
+    <div class="cap">สถานะการควบคุม</div>
+    <div class="lamp" id="lp-power"><i></i><span>Power Control</span><b>OFF</b></div>
+    <div class="lamp" id="lp-ign"><i></i><span>จุดไฟ</span><b>OFF</b></div>
+    <div class="lamp" id="lp-mid"><i></i><span>ไฟกลาง</span><b>OFF</b></div>
+    <div class="lamp" id="lp-high"><i></i><span>ไฟสูง</span><b>OFF</b></div>
+    <div class="lamp" id="lp-blower"><i></i><span>Blower</span><b>OFF</b></div>
+    <div class="lamp" id="lp-spark"><i></i><span>Spark</span><b>OFF</b></div>
+  </aside>
+
+  <main>
+    <!-- MAIN -->
+    <section class="page show" id="pg-main">
+      <div class="row rowA">
+        <div class="card temp">
+          <div class="big">
+            <div class="cardhead"><h2>TEMPERATURE · อุณหภูมิเตาหลอม</h2><span class="chip" id="phase">—</span></div>
+            <div class="sub">อุณหภูมิจริง (PV) · Thermocouple</div>
+            <div class="pv"><b id="pv">—</b><span>°C</span></div>
+            <div class="mt">
+              <div class="barlab"><span>0 °C</span><span id="pvPctLab">—</span><span id="svLab">SV —</span></div>
+              <div class="bar"><div id="pvBar"></div></div>
+            </div>
+          </div>
+          <div class="side">
+            <div class="read"><small>อุณหภูมิเป้าหมาย (SV)</small><b style="color:var(--sv)"><span id="sv">—</span> <em>°C</em></b></div>
+            <div class="read"><small>ส่วนต่าง (PV − SV)</small><b><span id="dev">—</span> <em>°C</em></b></div>
+            <div class="read"><small>อุณหภูมิภายนอก (Outside)</small><b><span id="outside">—</span> <em>°C</em></b></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="cardhead"><h2>INVERTER · พัดลม</h2><span class="chip ok" id="invChip">—</span></div>
+          <div class="two">
+            <div class="read"><small>Frequency</small><b style="color:var(--blue)"><span id="freq">—</span> <em>Hz</em></b></div>
+            <div class="read"><small>Current</small><b style="color:var(--blue)"><span id="amp">—</span> <em>A</em></b></div>
+          </div>
+          <div class="mt">
+            <div class="barlab"><span>คำสั่งควบคุม (Output)</span><span class="mono" id="outLab" style="color:var(--text)">—</span></div>
+            <div class="bar blue"><div id="outBar"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="row rowB">
+        <div class="card">
+          <div class="cardhead">
+            <h2>แนวโน้มอุณหภูมิ · 60 นาทีล่าสุด</h2>
+            <div class="legend"><span><i class="sw"></i>PV</span><span><i class="sw sv"></i>SV</span>
+              <button class="btn" style="height:36px" data-go="graph">ดูกราฟเต็ม</button></div>
+          </div>
+          <div class="chart">
+            <div class="yax" id="mY" style="height:300px"></div>
+            <div class="plot"><svg id="mSvg" height="300" viewBox="0 0 1000 300" preserveAspectRatio="none" role="img" aria-label="กราฟอุณหภูมิ PV เทียบกับ SV 60 นาทีล่าสุด"></svg><div class="xax" id="mX"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>เหตุการณ์ล่าสุด</h2>
+          <div id="events" style="display:flex;flex-direction:column;gap:12px"></div>
+          <button class="btn" style="margin-top:auto;justify-content:center" data-go="alarm">ดูประวัติ Alarm ทั้งหมด</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALARM -->
+    <section class="page" id="pg-alarm">
+      <div class="pagehead">
+        <div><h2>ALARM · สัญญาณเตือนและเหตุขัดข้อง</h2><p>เงื่อนไขป้องกันตามระบบความปลอดภัย · อ่านจากคอลัมน์ Alarm_Code</p></div>
+        <button class="btn" data-go="main">← กลับหน้าหลัก</button>
+      </div>
+      <div class="conds" id="conds"></div>
+      <div class="card tablecard">
+        <div class="cardhead"><h3>ประวัติการแจ้งเตือน</h3></div>
+        <table><thead><tr><th>วัน-เวลา</th><th>รหัส</th><th>ระดับ</th><th>รายละเอียด</th></tr></thead><tbody id="alarmLog"></tbody></table>
+      </div>
+    </section>
+
+    <!-- GRAPH -->
+    <section class="page" id="pg-graph">
+      <div class="pagehead">
+        <div><h2>GRAPH · แนวโน้มอุณหภูมิและความถี่</h2><p id="graphSub">—</p></div>
+        <button class="btn" data-go="main">← กลับหน้าหลัก</button>
+        <div class="seg" role="group" aria-label="ช่วงเวลา">
+          <button data-range="60" aria-pressed="true">1 ชม.</button>
+          <button data-range="480" aria-pressed="false">8 ชม.</button>
+          <button data-range="1440" aria-pressed="false">24 ชม.</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="legend"><span><i class="sw"></i>อุณหภูมิจริง PV (°C, แกนซ้าย)</span><span><i class="sw sv"></i>Set Point SV (°C)</span><span><i class="sw f"></i>ความถี่อินเวอร์เตอร์ (Hz, แกนขวา)</span></div>
+        <div class="chart">
+          <div class="yax" id="gY" style="height:460px"></div>
+          <div class="plot"><svg id="gSvg" height="460" viewBox="0 0 1000 300" preserveAspectRatio="none" role="img" aria-label="กราฟแนวโน้มอุณหภูมิและความถี่อินเวอร์เตอร์"></svg><div class="xax" id="gX"></div></div>
+          <div class="yax r" id="gY2" style="height:460px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DATA SOURCE -->
+    <section class="page" id="pg-data">
+      <div class="pagehead">
+        <div><h2>แหล่งข้อมูล · Google Sheets</h2><p>วางลิงก์ชีตเพื่อให้ Dashboard ดึงข้อมูลจริง ถ้าไม่ใส่ลิงก์จะแสดงข้อมูลตัวอย่าง</p></div>
+        <button class="btn" data-go="main">← กลับหน้าหลัก</button>
+      </div>
+      <div class="datagrid">
+        <div class="card">
+          <div><label for="url">ลิงก์ Google Sheets</label><input id="url" type="url" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
+          <div class="two">
+            <div><label for="tab">ชื่อแท็บข้อมูล</label><input id="tab" value="Log"></div>
+            <div><label for="rate">รอบการดึงข้อมูล</label><select id="rate"><option value="10">ทุก 10 วินาที</option><option value="30" selected>ทุก 30 วินาที</option><option value="60">ทุก 60 วินาที</option></select></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn primary" id="saveBtn" style="flex:1;justify-content:center">เชื่อมต่อและบันทึก</button>
+            <button class="btn" id="demoBtn">ใช้ข้อมูลตัวอย่าง</button>
+          </div>
+          <div class="msg" id="msg">ยังไม่ได้เชื่อมต่อ · กำลังแสดงข้อมูลตัวอย่าง</div>
+          <h3>วิธีเตรียมชีต</h3>
+          <ol>
+            <li>ให้ PLC / Gateway เขียนข้อมูล 1 แถวต่อรอบการอ่าน ลงแท็บ <code>Log</code> (แถวใหม่ต่อท้าย)</li>
+            <li>แถวแรกเป็นชื่อคอลัมน์ตามตารางด้านขวา (ลำดับคอลัมน์สลับได้)</li>
+            <li>กด แชร์ › ตั้งเป็น “ทุกคนที่มีลิงก์ดูได้” แล้วคัดลอกลิงก์ชีตมาวาง หรือใช้ลิงก์จาก ไฟล์ › แชร์ › เผยแพร่ไปยังเว็บ (CSV)</li>
+            <li>หลังกดบันทึก แอปจะจำลิงก์และรอบการดึงข้อมูลไว้ในเครื่องนี้ ครั้งต่อไปเปิดแอปแล้วเชื่อมต่อเองทันที</li>
+          </ol>
+        </div>
+        <div class="card tablecard">
+          <div class="cardhead"><h3>คอลัมน์ที่ Dashboard อ่าน</h3></div>
+          <table><thead><tr><th>ชื่อคอลัมน์</th><th>ความหมาย</th><th>ตัวอย่าง</th></tr></thead><tbody id="cols"></tbody></table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ====== ตั้งค่า: ใส่ลิงก์ชีตถาวรตรงนี้ได้ (หรือใส่ผ่านหน้า "แหล่งข้อมูล") ====== */
+var CONFIG = { sheetUrl: 'https://docs.google.com/spreadsheets/d/19inL3YxHEomKwRYK2cOWcawrW4p_YLTIse7qiJdtpCQ/edit', sheetTab: 'Log', refreshSec: 10 };
+
+var COLS = [
+  ['Timestamp','วันและเวลาที่บันทึก','2026-09-03 18:07:32'],
+  ['Temp_PV','อุณหภูมิจริงของเตา (°C)','790.8'],
+  ['Temp_SV','อุณหภูมิเป้าหมาย (°C)','800.0'],
+  ['Outside_Temp','อุณหภูมิภายนอก (°C)','34.0'],
+  ['Inv_Freq','ความถี่อินเวอร์เตอร์ (Hz)','25.5'],
+  ['Inv_Current','กระแสมอเตอร์ (A)','3.7'],
+  ['Control_Out','คำสั่งควบคุม (%)','51'],
+  ['Motor_Status','สถานะมอเตอร์','RUN / STOP'],
+  ['Inv_Status','สถานะอินเวอร์เตอร์','OK / FAULT'],
+  ['Power_Control','Power Control','ON / OFF'],
+  ['Burner_Stage','ระดับไฟ','IGNITE / MID / HIGH / OFF'],
+  ['Blower','พัดลม','ON / OFF'],
+  ['Spark','หัวจุดประกาย','ON / OFF'],
+  ['E_Stop','ปุ่มหยุดฉุกเฉิน','ON / OFF'],
+  ['Alarm_Code','รหัสแจ้งเตือน (ว่าง = ปกติ)','AL-01 … AL-06'],
+  ['Alarm_Text','ข้อความแจ้งเตือน (ไม่บังคับ)','อุณหภูมิสูงเกินกำหนด']
+];
+var ALARMS = [
+  ['AL-01','อุณหภูมิสูงเกินกำหนด','PLC ลดรอบพัดลม','warn'],
+  ['AL-02','Thermocouple ขาด / เสียหาย','หยุดพัดลม · แจ้งเตือน','bad'],
+  ['AL-03','มอเตอร์ทำงานเกินพิกัด','ลดรอบ / หยุดมอเตอร์','bad'],
+  ['AL-04','อินเวอร์เตอร์ขัดข้อง','หยุดพัดลม · แจ้งเตือน','bad'],
+  ['AL-05','พัดลมไม่หมุน','ปิดวาล์วลม · แจ้งเตือน','bad'],
+  ['AL-06','ปุ่มหยุดฉุกเฉิน (E-Stop)','หยุดระบบทั้งหมด','bad']
+];
+var LEVEL = { warn:'เตือน', bad:'ขัดข้อง', info:'ข้อมูล' };
+
+var state = { rows: [], demo: true, range: 60, timer: null, lastOk: null };
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function p2(n) { return (n < 10 ? '0' : '') + n; }
+function hhmm(d) { return d ? p2(d.getHours()) + ':' + p2(d.getMinutes()) : ''; }
+function num(v) { var n = parseFloat(String(v).replace(/,/g, '')); return isFinite(n) ? n : NaN; }
+function isOn(v) { return /^(on|1|true|run|yes|high)$/i.test(String(v || '').trim()); }
+function fx(n, d) { return isFinite(n) ? n.toFixed(d == null ? 1 : d) : '—'; }
+
+/* ---------- Google Sheets ---------- */
+function toCsvUrl(u, tab) {
+  u = u.trim();
+  if (/output=csv|tqx=out:csv/.test(u)) return u;
+  if (/\/spreadsheets\/d\/e\//.test(u)) return u.replace(/\/pub(html)?(\?.*)?$/, '/pub?output=csv');
+  var m = u.match(/\/spreadsheets\/d\/([\w-]+)/);
+  if (m) return 'https://docs.google.com/spreadsheets/d/' + m[1] + '/gviz/tq?tqx=out:csv&headers=1&sheet=' + encodeURIComponent(tab || 'Log');
+  return u;
+}
+function parseCsv(text) {
+  var rows = [], row = [], cur = '', q = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (c !== '\r') cur += c;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+function parseTime(s) {
+  s = String(s || '').trim(); if (!s) return null;
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0));
+  var d = new Date(s.replace(' ', 'T'));
+  return isNaN(d) ? null : d;
+}
+function normalize(table) {
+  var head = table[0].map(function (h) { return h.trim().toLowerCase(); });
+  var ix = function (name) { return head.indexOf(name.toLowerCase()); };
+  var map = {}; COLS.forEach(function (c) { map[c[0]] = ix(c[0]); });
+  if (map.Temp_PV < 0) throw new Error('ไม่พบคอลัมน์ Temp_PV ในแถวแรกของชีต');
+  var g = function (r, k) { return map[k] >= 0 ? r[map[k]] : ''; };
+  return table.slice(1).filter(function (r) { return r.join('').trim() !== ''; }).map(function (r) {
+    return { t: parseTime(g(r,'Timestamp')), pv: num(g(r,'Temp_PV')), sv: num(g(r,'Temp_SV')), out: num(g(r,'Outside_Temp')),
+      f: num(g(r,'Inv_Freq')), a: num(g(r,'Inv_Current')), co: num(g(r,'Control_Out')),
+      motor: g(r,'Motor_Status'), inv: g(r,'Inv_Status'), power: g(r,'Power_Control'), stage: String(g(r,'Burner_Stage')).trim().toUpperCase(),
+      blower: g(r,'Blower'), spark: g(r,'Spark'), estop: g(r,'E_Stop'), code: String(g(r,'Alarm_Code')).trim().toUpperCase(), text: g(r,'Alarm_Text') };
+  });
+}
+
+/* ---------- ข้อมูลตัวอย่าง (จำลองรอบการหลอม 120 นาที) ---------- */
+function demoRows() {
+  var rows = [], now = new Date(); now.setSeconds(0, 0);
+  var base = Math.floor(now.getTime() / 60000);
+  for (var i = 1439; i >= 0; i--) {
+    var m = base - i, p = ((m % 120) + 120) % 120, n = 1.6 * Math.sin(m / 3.1), pv, f, code = '';
+    if (p < 75) { pv = 800 - 500 * Math.exp(-p / 15) + n; f = 25 + 25 * Math.exp(-p / 15) + 0.6 * Math.sin(m / 2.3); }
+    else if (p < 105) { pv = 800 + n; f = 24 + 0.8 * Math.sin(m / 2.3); }
+    else { pv = 800 - ((p - 105) / 15) * 500; f = 0; }
+    if (p === 90 && Math.floor(m / 120) % 3 === 0) code = 'AL-01';
+    rows.push({ t: new Date(m * 60000), pv: pv, sv: 800, out: 34, f: f, a: f ? 1.2 + f * 0.1 : 0, co: f / 50 * 100,
+      motor: f ? 'RUN' : 'STOP', inv: 'OK', power: 'ON', stage: p < 105 ? 'HIGH' : 'OFF', blower: f ? 'ON' : 'OFF', spark: 'OFF', estop: 'OFF', code: code, text: '' });
+  }
+  return rows;
+}
+
+/* ---------- โหลดข้อมูล ---------- */
+function load() {
+  if (!CONFIG.sheetUrl) { state.rows = demoRows(); state.demo = true; state.lastOk = new Date(); setStatus('demo'); render(); return Promise.resolve(); }
+  var done = function (table) {
+    var rows = normalize(table);
+    if (!rows.length) throw new Error('ชีตยังไม่มีแถวข้อมูล');
+    state.rows = rows; state.demo = false; state.lastOk = new Date(); setStatus('ok'); render(); saveLocal(true); $('netbar').classList.remove('show');
+  };
+  var m = CONFIG.sheetUrl.match(/\/spreadsheets\/d\/([\w-]+)/);
+  var job = (m && !/\/d\/e\//.test(CONFIG.sheetUrl))
+    ? loadGviz(m[1], CONFIG.sheetTab).then(done)
+    : fetch(toCsvUrl(CONFIG.sheetUrl, CONFIG.sheetTab), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function (txt) {
+          if (/^\s*<(!doctype|html)/i.test(txt)) throw new Error('ชีตยังไม่ได้เปิดสิทธิ์ให้ดูผ่านลิงก์');
+          done(parseCsv(txt));
+        });
+  return job.catch(function (e) { setStatus('err', navigator.onLine === false ? 'ไม่มีอินเทอร์เน็ต' : e.message); if (navigator.onLine === false) $('netbar').classList.add('show'); });
+}
+/* อ่านชีตผ่านแท็ก script (ใช้ได้แม้เปิดไฟล์จากเครื่องโดยตรง ไม่ติดข้อจำกัด CORS) */
+var gvizSeq = 0;
+function loadGviz(id, tab) {
+  return new Promise(function (resolve, reject) {
+    var cb = '__gviz' + (++gvizSeq) + '_' + Date.now(), s = document.createElement('script');
+    var timer = setTimeout(function () { finish(); reject(new Error('หมดเวลารอข้อมูลจาก Google Sheets')); }, 15000);
+    function finish() { clearTimeout(timer); try { delete window[cb]; } catch (e) { window[cb] = undefined; } if (s.parentNode) s.parentNode.removeChild(s); }
+    window[cb] = function (res) {
+      finish();
+      if (!res || res.status === 'error' || !res.table) { reject(new Error((res && res.errors && res.errors[0] && (res.errors[0].detailed_message || res.errors[0].message)) || 'อ่านชีตไม่ได้')); return; }
+      var cols = res.table.cols || [], head = cols.map(function (c) { return c.label || ''; });
+      var body = (res.table.rows || []).map(function (r) { return cols.map(function (c, i) {
+        var cell = r.c && r.c[i]; if (!cell || cell.v == null) return '';
+        return (/date|time/.test(c.type) && cell.f != null) ? String(cell.f) : String(cell.v); }); });
+      if (head.join('') === '' && body.length) head = body.pop();
+      body.reverse();  /* ชีตส่งแถวใหม่สุดมาก่อน (ดึงแค่ 9000 แถวล่าสุด) จึงกลับลำดับให้เก่า→ใหม่ */
+      resolve([head].concat(body));
+    };
+    s.onerror = function () { finish(); reject(new Error('ชีตยังไม่ได้เปิดสิทธิ์ให้ดูผ่านลิงก์ หรือไม่มีอินเทอร์เน็ต')); };
+    s.src = 'https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq?tqx=out:json;responseHandler:' + cb + '&headers=1&sheet=' + encodeURIComponent(tab || 'Log') + '&tq=' + encodeURIComponent('select * order by A desc limit 9000') + '&_=' + Date.now();
+    document.head.appendChild(s);
+  });
+}
+function setStatus(kind, err) {
+  var dot = $('srcDot'), msg = $('msg'), t = state.lastOk ? p2(state.lastOk.getHours()) + ':' + p2(state.lastOk.getMinutes()) + ':' + p2(state.lastOk.getSeconds()) : '—';
+  if (kind === 'ok') { dot.className = 'dot'; $('srcKind').textContent = 'Google Sheets · เชื่อมต่อแล้ว'; $('srcText').textContent = 'อัปเดตล่าสุด ' + t + ' · ทุก ' + CONFIG.refreshSec + ' วินาที';
+    msg.className = 'msg ok'; msg.textContent = 'เชื่อมต่อสำเร็จ · อ่านได้ ' + state.rows.length + ' แถว · ล่าสุด ' + t; }
+  else if (kind === 'demo') { dot.className = 'dot warn'; $('srcKind').textContent = 'ข้อมูลตัวอย่าง (ยังไม่เชื่อมต่อชีต)'; $('srcText').textContent = 'คลิกเพื่อใส่ลิงก์ Google Sheets';
+    msg.className = 'msg'; msg.textContent = 'ยังไม่ได้เชื่อมต่อ · กำลังแสดงข้อมูลตัวอย่าง'; }
+  else { dot.className = 'dot bad'; $('srcKind').textContent = 'Google Sheets · เชื่อมต่อไม่ได้'; $('srcText').textContent = 'ข้อมูลล่าสุดที่อ่านได้ ' + t;
+    msg.className = 'msg bad'; msg.textContent = 'เชื่อมต่อไม่ได้: ' + err + ' · ตรวจลิงก์ ชื่อแท็บ และสิทธิ์การแชร์'; }
+}
+var STORE = 'furnace-hmi.v1';
+function saveLocal(withRows) {
+  try {
+    var o = { sheetUrl: CONFIG.sheetUrl, sheetTab: CONFIG.sheetTab, refreshSec: CONFIG.refreshSec };
+    if (withRows && !state.demo) o.rows = state.rows.slice(-600).map(function (r) { var x = {}; for (var k in r) x[k] = r[k]; x.t = r.t ? r.t.getTime() : null; return x; });
+    else { var old = JSON.parse(localStorage.getItem(STORE) || '{}'); if (old.rows && old.sheetUrl === CONFIG.sheetUrl) o.rows = old.rows; }
+    o.savedAt = Date.now();
+    localStorage.setItem(STORE, JSON.stringify(o));
+  } catch (e) {}
+}
+function readLocal() { try { return JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) { return null; } }
+function schedule() { clearInterval(state.timer); state.timer = setInterval(load, CONFIG.refreshSec * 1000); }
+
+/* ---------- แสดงผล ---------- */
+function lamp(id, on) { var el = $(id); el.classList.toggle('on', !!on); el.querySelector('b').textContent = on ? 'ON' : 'OFF'; }
+function windowRows(minutes) {
+  var rows = state.rows, last = rows[rows.length - 1];
+  if (last && last.t) { var from = last.t.getTime() - minutes * 60000; var w = rows.filter(function (r) { return r.t && r.t.getTime() >= from; }); if (w.length > 1) return w; }
+  return rows.slice(-Math.min(rows.length, minutes));
+}
+function thin(rows, max) { if (rows.length <= max) return rows; var step = rows.length / max, out = []; for (var i = 0; i < max; i++) out.push(rows[Math.floor(i * step)]); out.push(rows[rows.length - 1]); return out; }
+function line(rows, key, lo, hi, H) {
+  var n = rows.length, seg = [], cur = [];
+  rows.forEach(function (r, i) { var v = r[key]; if (!isFinite(v)) { if (cur.length) seg.push(cur); cur = []; return; }
+    cur.push(((n > 1 ? i / (n - 1) : 0) * 1000).toFixed(1) + ',' + (H - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo) * H).toFixed(1)); });
+  if (cur.length) seg.push(cur);
+  return seg;
+}
+function drawChart(svg, yEl, xEl, rows, withFreq, y2El) {
+  var H = 300; rows = thin(rows, 400);
+  var vals = []; rows.forEach(function (r) { if (isFinite(r.pv)) vals.push(r.pv); if (isFinite(r.sv)) vals.push(r.sv); });
+  var lo = vals.length ? Math.floor((Math.min.apply(null, vals) - 20) / 100) * 100 : 0, hi = vals.length ? Math.ceil((Math.max.apply(null, vals) + 20) / 100) * 100 : 1000;
+  if (lo < 0) lo = 0; if (hi <= lo) hi = lo + 100;
+  var h = '', i;
+  for (i = 1; i < 5; i++) h += '<line x1="0" x2="1000" y1="' + (H * i / 5) + '" y2="' + (H * i / 5) + '" stroke="#E6EBF2" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+  var add = function (key, a, b, stroke, w, dash) { line(rows, key, a, b, H).forEach(function (s) {
+    h += '<polyline points="' + s.join(' ') + '" fill="none" stroke="' + stroke + '" stroke-width="' + w + '" stroke-linejoin="round" vector-effect="non-scaling-stroke"' + (dash ? ' stroke-dasharray="6 5"' : '') + '/>'; }); };
+  if (withFreq) add('f', 0, 60, '#1D6FD1', 1.5);
+  add('sv', lo, hi, '#15803D', 2, true);
+  add('pv', lo, hi, '#B45309', 2.5);
+  svg.innerHTML = h;
+  var yl = ''; for (i = 5; i >= 0; i--) yl += '<span>' + Math.round(lo + (hi - lo) * i / 5) + '</span>'; yEl.innerHTML = yl;
+  if (y2El) { var y2 = ''; for (i = 5; i >= 0; i--) y2 += '<span>' + (12 * i) + '</span>'; y2El.innerHTML = y2; }
+  var xl = ''; for (i = 0; i < 5; i++) { var r = rows[Math.round((rows.length - 1) * i / 4)]; xl += '<span>' + (r && r.t ? hhmm(r.t) : '') + '</span>'; } xEl.innerHTML = xl;
+}
+function alarmEvents() {
+  var out = [], prev = '';
+  state.rows.forEach(function (r) { if (r.code && r.code !== prev) out.push(r); prev = r.code; });
+  return out.reverse();
+}
+function alarmInfo(code) { for (var i = 0; i < ALARMS.length; i++) if (ALARMS[i][0] === code) return ALARMS[i]; return [code, '', '', 'warn']; }
+function stamp(d) { return d ? p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + ' ' + hhmm(d) : '—'; }
+
+function render() {
+  var rows = state.rows, r = rows[rows.length - 1]; if (!r) return;
+  var dev = r.pv - r.sv, pct = isFinite(r.pv) && r.sv > 0 ? Math.max(0, Math.min(100, Math.round(r.pv / r.sv * 100))) : 0;
+  $('pv').textContent = fx(r.pv); $('sv').textContent = fx(r.sv); $('outside').textContent = fx(r.out);
+  $('dev').textContent = isFinite(dev) ? (dev > 0 ? '+' : '') + dev.toFixed(1) : '—';
+  $('pvBar').style.width = pct + '%'; $('pvPctLab').textContent = 'ความคืบหน้าสู่ Set Point · ' + pct + '%'; $('svLab').textContent = 'SV ' + fx(r.sv) + ' °C';
+  var ph = $('phase'), running = isOn(r.blower) || /run/i.test(r.motor);
+  if (r.code) { ph.className = 'chip bad'; ph.textContent = 'ผิดปกติ (Alarm)'; }
+  else if (!isFinite(dev)) { ph.className = 'chip'; ph.textContent = '—'; }
+  else if (!running) { ph.className = 'chip'; ph.textContent = 'พัดลมหยุด / สิ้นสุดรอบ'; }
+  else if (dev > 5) { ph.className = 'chip bad'; ph.textContent = 'อุณหภูมิสูงกว่า Set Point'; }
+  else if (dev < -50) { ph.className = 'chip'; ph.textContent = 'ช่วงเริ่มต้นการหลอม'; }
+  else if (dev < -5) { ph.className = 'chip'; ph.textContent = 'ช่วงใกล้ Set Point'; }
+  else { ph.className = 'chip ok'; ph.textContent = 'ช่วงรักษาอุณหภูมิ'; }
+  $('freq').textContent = fx(r.f); $('amp').textContent = fx(r.a);
+  var co = isFinite(r.co) ? Math.max(0, Math.min(100, Math.round(r.co))) : 0;
+  $('outLab').textContent = isFinite(r.co) ? co + '%' : '—'; $('outBar').style.width = co + '%';
+  var ic = $('invChip'), fault = /fault|alarm|err/i.test(r.inv);
+  ic.className = 'chip ' + (fault ? 'bad' : 'ok'); ic.textContent = (r.motor || '—') + ' · ' + (fault ? 'ขัดข้อง' : 'ปกติ');
+  lamp('lp-power', isOn(r.power)); lamp('lp-ign', /IGN/.test(r.stage)); lamp('lp-mid', /MID|LOW/.test(r.stage)); lamp('lp-high', /HIGH/.test(r.stage));
+  lamp('lp-blower', isOn(r.blower)); lamp('lp-spark', isOn(r.spark));
+  var es = $('estop'), eon = isOn(r.estop); es.classList.toggle('on', eon); es.textContent = eon ? 'EMERGENCY ON' : 'EMERGENCY OFF';
+
+  drawChart($('mSvg'), $('mY'), $('mX'), windowRows(60), false);
+  drawChart($('gSvg'), $('gY'), $('gX'), windowRows(state.range), true, $('gY2'));
+  $('graphSub').textContent = (state.demo ? 'ข้อมูลตัวอย่าง' : 'อ่านจาก Google Sheets') + ' · ' + rows.length + ' แถว';
+
+  var evs = alarmEvents();
+  $('events').innerHTML = evs.length ? evs.slice(0, 3).map(function (e) { var a = alarmInfo(e.code);
+    return '<div class="ev"><time>' + esc(hhmm(e.t)) + '</time><div><b class="lv-' + a[3] + '">' + LEVEL[a[3]] + ' · ' + esc(e.code) + '</b><span>' + esc(e.text || a[1]) + '</span></div></div>'; }).join('')
+    : '<div class="empty">ไม่มีสัญญาณเตือน</div>';
+  $('conds').innerHTML = ALARMS.map(function (a) { var act = r.code === a[0];
+    return '<div class="cond' + (act ? ' act' : '') + '"><i></i><div><b>' + a[1] + '</b><small>' + a[0] + ' · ' + a[2] + '</small></div><b>' + (act ? 'แจ้งเตือน' : 'ปกติ') + '</b></div>'; }).join('');
+  $('alarmLog').innerHTML = evs.length ? evs.slice(0, 50).map(function (e) { var a = alarmInfo(e.code);
+    return '<tr><td class="mono">' + esc(stamp(e.t)) + '</td><td class="mono">' + esc(e.code) + '</td><td class="lv-' + a[3] + '"><b>' + LEVEL[a[3]] + '</b></td><td>' + esc(e.text || a[1]) + '</td></tr>'; }).join('')
+    : '<tr><td colspan="4" class="empty" style="padding:16px">ไม่มีประวัติการแจ้งเตือน</td></tr>';
+}
+
+/* ---------- การทำงานของหน้า ---------- */
+function go(name) { ['main','alarm','graph','data'].forEach(function (p) { $('pg-' + p).classList.toggle('show', p === name); }); window.scrollTo(0, 0); }
+document.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { go(b.getAttribute('data-go')); }); });
+$('srcBtn').addEventListener('click', function () { go('data'); });
+$('refreshBtn').addEventListener('click', load);
+document.querySelectorAll('[data-range]').forEach(function (b) { b.addEventListener('click', function () {
+  state.range = +b.getAttribute('data-range');
+  document.querySelectorAll('[data-range]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+  render(); }); });
+function saveUrl() { saveLocal(false); }
+$('saveBtn').addEventListener('click', function () {
+  CONFIG.sheetUrl = $('url').value.trim(); CONFIG.sheetTab = $('tab').value.trim() || 'Log'; CONFIG.refreshSec = +$('rate').value;
+  saveUrl(); schedule(); load(); });
+$('demoBtn').addEventListener('click', function () { CONFIG.sheetUrl = ''; $('url').value = ''; load(); });
+$('cols').innerHTML = COLS.map(function (c) { return '<tr><td><code>' + c[0] + '</code></td><td>' + c[1] + '</td><td class="mono">' + c[2] + '</td></tr>'; }).join('');
+
+function tick() { var d = new Date(); $('clkDate').textContent = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear(); $('clkTime').textContent = p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()); }
+(function init() {
+  var saved = readLocal();
+  if (saved) {
+    if (typeof saved.sheetUrl === 'string') CONFIG.sheetUrl = saved.sheetUrl;
+    if (saved.sheetTab) CONFIG.sheetTab = saved.sheetTab;
+    if (+saved.refreshSec >= 5) CONFIG.refreshSec = +saved.refreshSec;
+    if (saved.rows && saved.rows.length && saved.sheetUrl === CONFIG.sheetUrl) {
+      state.rows = saved.rows.map(function (r) { r.t = r.t ? new Date(r.t) : null; return r; });
+      state.demo = false; state.lastOk = new Date(saved.savedAt); render(); setStatus('err', 'กำลังเชื่อมต่อ…');
+    }
+  }
+  try { var q = new URLSearchParams(location.search);
+    if (q.get('sheet')) CONFIG.sheetUrl = q.get('sheet');
+    if (q.get('tab')) CONFIG.sheetTab = q.get('tab');
+    if (+q.get('every') >= 5) CONFIG.refreshSec = +q.get('every'); } catch (e) {}
+  $('url').value = CONFIG.sheetUrl; $('tab').value = CONFIG.sheetTab; $('rate').value = String(CONFIG.refreshSec);
+  tick(); setInterval(tick, 1000); schedule(); load();
+  window.addEventListener('online', function () { $('netbar').classList.remove('show'); load(); });
+  window.addEventListener('offline', function () { $('netbar').classList.add('show'); });
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; $('installBtn').classList.add('show'); });
+  window.addEventListener('appinstalled', function () { $('installBtn').classList.remove('show'); deferred = null; });
+  $('installBtn').addEventListener('click', function () { if (!deferred) return; deferred.prompt(); deferred.userChoice.finally(function () { deferred = null; $('installBtn').classList.remove('show'); }); });
+})();
+</script>
+</body>
+</html>
