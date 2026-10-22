@@ -1,6 +1,6 @@
 /* Service worker: เก็บตัวแอปไว้ในเครื่อง ให้เปิดได้แม้อินเทอร์เน็ตหลุด
    ข้อมูลจาก Google Sheets ไม่ผ่าน service worker นี้ (ดึงสดทุกครั้ง) */
-var CACHE = 'furnace-hmi-v3';
+var CACHE = 'furnace-hmi-v4';
 var SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
