@@ -141,6 +141,10 @@ code{font-family:var(--mono);color:var(--blue2);font-size:13px}
 .install{display:none}.install.show{display:inline-flex}
 .netbar{display:none;padding:8px 24px;background:var(--warnbg);border-bottom:1px solid var(--warnline);color:var(--warn);font-size:14px}
 .netbar.show{display:block}
+.stale{display:none;align-items:center;gap:10px;padding:10px 24px;background:var(--badbg);border-bottom:1px solid var(--badline);color:var(--bad);font-size:15px;font-weight:600}
+.stale.show{display:flex}
+.stale svg{flex-shrink:0}
+body.is-stale .pv b,body.is-stale .read b,body.is-stale .bar div{opacity:.4}
 @media (display-mode: standalone){header{padding-top:max(14px,env(safe-area-inset-top))}}
 @media (max-width:1100px){.rowA,.rowB,.datagrid{grid-template-columns:1fr}}
 @media (max-width:760px){.shell{flex-direction:column}aside{width:auto;border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr}aside .cap{grid-column:1/-1}main{padding:16px}.brand h1{font-size:20px;white-space:normal}.brand .co span:first-child{font-size:16px}}
@@ -168,6 +172,7 @@ code{font-family:var(--mono);color:var(--blue2);font-size:13px}
   <div class="clock mono"><span id="clkDate">—</span><span id="clkTime">—</span></div>
   <div class="estop" id="estop">EMERGENCY OFF</div>
 </header>
+<div class="stale" id="stale" role="alert"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span id="staleText"></span></div>
 <div class="netbar" id="netbar">ไม่มีอินเทอร์เน็ต · กำลังแสดงข้อมูลล่าสุดที่บันทึกไว้ในเครื่อง</div>
 
 <div class="shell">
@@ -304,6 +309,7 @@ code{font-family:var(--mono);color:var(--blue2);font-size:13px}
 
 <script>
 /* ====== ตั้งค่า: ใส่ลิงก์ชีตถาวรตรงนี้ได้ (หรือใส่ผ่านหน้า "แหล่งข้อมูล") ====== */
+var STALE_SEC = 60;   /* ไม่มีข้อมูลใหม่เกินกี่วินาทีจึงขึ้นแถบเตือน */
 var CONFIG = { sheetUrl: 'https://docs.google.com/spreadsheets/d/19inL3YxHEomKwRYK2cOWcawrW4p_YLTIse7qiJdtpCQ/edit', sheetTab: 'Log', refreshSec: 10 };
 
 var COLS = [
@@ -407,8 +413,7 @@ function load() {
   if (!CONFIG.sheetUrl) { state.rows = demoRows(); state.demo = true; state.lastOk = new Date(); setStatus('demo'); render(); return Promise.resolve(); }
   var done = function (table) {
     var rows = normalize(table);
-    if (!rows.length) throw new Error('ชีตยังไม่มีแถวข้อมูล');
-    state.rows = rows; state.demo = false; state.lastOk = new Date(); setStatus('ok'); render(); saveLocal(true); $('netbar').classList.remove('show');
+    state.rows = rows; state.demo = false; state.lastOk = new Date(); setStatus(rows.length ? 'ok' : 'empty'); render(); saveLocal(true); $('netbar').classList.remove('show');
   };
   var m = CONFIG.sheetUrl.match(/\/spreadsheets\/d\/([\w-]+)/);
   var job = (m && !/\/d\/e\//.test(CONFIG.sheetUrl))
@@ -448,6 +453,8 @@ function setStatus(kind, err) {
   var dot = $('srcDot'), msg = $('msg'), t = state.lastOk ? p2(state.lastOk.getHours()) + ':' + p2(state.lastOk.getMinutes()) + ':' + p2(state.lastOk.getSeconds()) : '—';
   if (kind === 'ok') { dot.className = 'dot'; $('srcKind').textContent = 'Google Sheets · เชื่อมต่อแล้ว'; $('srcText').textContent = 'อัปเดตล่าสุด ' + t + ' · ทุก ' + CONFIG.refreshSec + ' วินาที';
     msg.className = 'msg ok'; msg.textContent = 'เชื่อมต่อสำเร็จ · อ่านได้ ' + state.rows.length + ' แถว · ล่าสุด ' + t; }
+  else if (kind === 'empty') { dot.className = 'dot warn'; $('srcKind').textContent = 'Google Sheets · เชื่อมต่อแล้ว'; $('srcText').textContent = 'ยังไม่มีข้อมูลจาก HMI · ตรวจทุก ' + CONFIG.refreshSec + ' วินาที';
+    msg.className = 'msg'; msg.textContent = 'เชื่อมต่อสำเร็จ แต่แท็บ ' + CONFIG.sheetTab + ' ยังไม่มีแถวข้อมูล · รอ HMI ส่งข้อมูลเข้าชีต'; }
   else if (kind === 'demo') { dot.className = 'dot warn'; $('srcKind').textContent = 'ข้อมูลตัวอย่าง (ยังไม่เชื่อมต่อชีต)'; $('srcText').textContent = 'คลิกเพื่อใส่ลิงก์ Google Sheets';
     msg.className = 'msg'; msg.textContent = 'ยังไม่ได้เชื่อมต่อ · กำลังแสดงข้อมูลตัวอย่าง'; }
   else { dot.className = 'dot bad'; $('srcKind').textContent = 'Google Sheets · เชื่อมต่อไม่ได้'; $('srcText').textContent = 'ข้อมูลล่าสุดที่อ่านได้ ' + t;
@@ -507,7 +514,7 @@ function alarmInfo(code) { for (var i = 0; i < ALARMS.length; i++) if (ALARMS[i]
 function stamp(d) { return d ? p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + ' ' + hhmm(d) : '—'; }
 
 function render() {
-  var rows = state.rows, r = rows[rows.length - 1]; if (!r) return;
+  var rows = state.rows, r = rows[rows.length - 1] || { t: null, pv: NaN, sv: NaN, out: NaN, f: NaN, a: NaN, co: NaN, motor: '', inv: '', power: '', stage: '', blower: '', spark: '', estop: '', code: '', text: '' };
   var dev = r.pv - r.sv, pct = isFinite(r.pv) && r.sv > 0 ? Math.max(0, Math.min(100, Math.round(r.pv / r.sv * 100))) : 0;
   $('pv').textContent = fx(r.pv); $('sv').textContent = fx(r.sv); $('outside').textContent = fx(r.out);
   $('dev').textContent = isFinite(dev) ? (dev > 0 ? '+' : '') + dev.toFixed(1) : '—';
@@ -524,7 +531,7 @@ function render() {
   var co = isFinite(r.co) ? Math.max(0, Math.min(100, Math.round(r.co))) : 0;
   $('outLab').textContent = isFinite(r.co) ? co + '%' : '—'; $('outBar').style.width = co + '%';
   var ic = $('invChip'), fault = /fault|alarm|err/i.test(r.inv);
-  ic.className = 'chip ' + (fault ? 'bad' : 'ok'); ic.textContent = (r.motor || '—') + ' · ' + (fault ? 'ขัดข้อง' : 'ปกติ');
+  ic.className = 'chip ' + (fault ? 'bad' : 'ok'); ic.textContent = rows.length ? (r.motor || '—') + ' · ' + (fault ? 'ขัดข้อง' : 'ปกติ') : '—';
   lamp('lp-power', isOn(r.power)); lamp('lp-ign', /IGN/.test(r.stage)); lamp('lp-mid', /MID|LOW/.test(r.stage)); lamp('lp-high', /HIGH/.test(r.stage));
   lamp('lp-blower', isOn(r.blower)); lamp('lp-spark', isOn(r.spark));
   var es = $('estop'), eon = isOn(r.estop); es.classList.toggle('on', eon); es.textContent = eon ? 'EMERGENCY ON' : 'EMERGENCY OFF';
@@ -560,7 +567,22 @@ $('saveBtn').addEventListener('click', function () {
 $('demoBtn').addEventListener('click', function () { CONFIG.sheetUrl = ''; $('url').value = ''; load(); });
 $('cols').innerHTML = COLS.map(function (c) { return '<tr><td><code>' + c[0] + '</code></td><td>' + c[1] + '</td><td class="mono">' + c[2] + '</td></tr>'; }).join('');
 
-function tick() { var d = new Date(); $('clkDate').textContent = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear(); $('clkTime').textContent = p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()); }
+function fmtAge(sec) {
+  var m = Math.floor(sec / 60);
+  if (m < 60) return m + ' นาที';
+  var h = Math.floor(m / 60);
+  if (h < 24) return h + ' ชม. ' + (m % 60) + ' นาที';
+  return Math.floor(h / 24) + ' วัน ' + (h % 24) + ' ชม.';
+}
+function checkStale() {
+  var r = state.rows[state.rows.length - 1], el = $('stale');
+  var age = r && r.t ? (Date.now() - r.t.getTime()) / 1000 : 0;
+  var stale = !state.demo && r && r.t && age > STALE_SEC;
+  el.classList.toggle('show', !!stale);
+  document.body.classList.toggle('is-stale', !!stale);
+  if (stale) $('staleText').textContent = 'ไม่มีข้อมูลใหม่จาก HMI มา ' + fmtAge(age) + ' · ข้อมูลล่าสุดเมื่อ ' + p2(r.t.getDate()) + '/' + p2(r.t.getMonth() + 1) + ' ' + p2(r.t.getHours()) + ':' + p2(r.t.getMinutes()) + ':' + p2(r.t.getSeconds()) + ' · ค่าบนจอไม่ใช่ค่าปัจจุบัน ตรวจ HMI และสายสื่อสาร';
+}
+function tick() { checkStale(); var d = new Date(); $('clkDate').textContent = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear(); $('clkTime').textContent = p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()); }
 (function init() {
   var saved = readLocal();
   if (saved) {
